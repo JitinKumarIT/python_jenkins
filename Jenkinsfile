@@ -5,7 +5,7 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/YOUR_USERNAME/flask-ci-cd-demo.git'
+                git 'https://github.com/JitinKumarIT/python_jenkins.git'
             }
         }
 
