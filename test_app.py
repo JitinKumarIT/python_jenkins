@@ -8,7 +8,7 @@ class TestApp(unittest.TestCase):
     def test_hello(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Hello, CI/CD Pipeline!", response.data)
+        self.assertIn(b"Hello, Jenkins CI/CD Pipeline!", response.data)
 
 if __name__ == '__main__':
     unittest.main()
