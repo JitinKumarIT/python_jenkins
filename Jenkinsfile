@@ -1,29 +1,83 @@
 pipeline {
     agent any
+    
+    environment {
+        // Define environment variables for the pipeline
+        PYTHON_VENV = "venv"
+        ARTIFACT_NAME = "python-app-build.zip"
+        DEPLOY_DIR = "/tmp/production-app" // Dummy deployment directory
+    }
 
     stages {
-        stage('Install Python') {
+        // ---------------- CI PIPELINE ----------------
+
+        stage('Checkout') {
             steps {
-                sh 'apt update && apt install -y python3 python3-pip'
+                // Clones the repository from GitHub
+                checkout scm
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build & Test') {
             steps {
-                sh 'pip3 install -r requirements.txt'
+                // Set up a virtual environment, install dependencies, and run tests
+                sh '''
+                    python3 -m venv ${PYTHON_VENV}
+                    . ${PYTHON_VENV}/bin/activate
+                    pip install -r requirements.txt
+                    python3 -m unittest test_app.py
+                '''
             }
         }
 
-        stage('Run Tests') {
+        stage('Create Artifact') {
             steps {
-                sh 'pytest'
+                // Package the application files into a zip artifact
+                sh 'zip -r ${ARTIFACT_NAME} app.py requirements.txt'
+                
+                // Tell Jenkins to store this artifact for the build
+                archiveArtifacts artifacts: "${ARTIFACT_NAME}", fingerprint: true
             }
         }
 
-        stage('Run App') {
+        // ---------------- CD PIPELINE ----------------
+
+        stage('Deploy') {
             steps {
-                sh 'nohup python3 app.py &'
+                // Simulate deploying the artifact to a server
+                sh '''
+                    echo "Starting deployment process..."
+                    
+                    # 1. Create deployment directory
+                    mkdir -p ${DEPLOY_DIR}
+                    
+                    # 2. Extract the artifact into the deployment directory
+                    unzip -o ${ARTIFACT_NAME} -d ${DEPLOY_DIR}
+                    
+                    # 3. Setup production environment and start app (Dummy Commands)
+                    cd ${DEPLOY_DIR}
+                    python3 -m venv prod_venv
+                    . prod_venv/bin/activate
+                    pip install -r requirements.txt
+                    
+                    # In a real scenario, you would restart a systemd service here.
+                    # e.g., sudo systemctl restart my-python-app
+                    echo "Application deployed successfully to ${DEPLOY_DIR}!"
+                '''
             }
+        }
+    }
+    
+    post {
+        always {
+            // Clean up the workspace after the run
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs.'
         }
     }
 }
