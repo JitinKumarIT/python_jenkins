@@ -1,13 +1,11 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3.10'
+        }
+    }
 
     stages {
-
-        stage('Clone Repository') {
-            steps {
-                git branch: 'main', url: 'https://github.com/JitinKumarIT/python_jenkins.git'
-            }
-        }
 
         stage('Install Dependencies') {
             steps {
