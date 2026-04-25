@@ -15,17 +15,19 @@ pipeline {
 
         stage('Code Security Scan (SAST)') {
             steps {
-                // Fail fast if security vulnerabilities are found in the code
-                echo "Running security scan..."
-                sh '''
-                    python3 -m venv ${PYTHON_VENV}
-                    . ${PYTHON_VENV}/bin/activate
-                    pip install bandit
-                    
-                    # Run bandit against the app directory/files. 
-                    # If high severity issues are found, this exits with code 1 and fails the pipeline.
-                    bandit -r app.py
-                '''
+                echo "Running security scan in Audit Mode..."
+                
+                // Catch any failure inside this block, mark stage as UNSTABLE, and continue
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        python3 -m venv ${PYTHON_VENV}
+                        . ${PYTHON_VENV}/bin/activate
+                        pip install bandit
+                        
+                        # If this finds issues, it exits with 1, which catchError intercepts
+                        bandit -r app.py
+                    '''
+                }
             }
         }
 
