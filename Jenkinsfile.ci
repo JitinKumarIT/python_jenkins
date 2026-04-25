@@ -47,6 +47,7 @@ pipeline {
                 archiveArtifacts artifacts: "${ARTIFACT_NAME}", fingerprint: true
             }
         }
+   }
         
     post {
         // Only triggers if all stages above pass successfully
