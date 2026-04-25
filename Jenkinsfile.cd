@@ -17,7 +17,7 @@ pipeline {
                 echo "Fetching artifact from CI Pipeline Build: ${params.UPSTREAM_BUILD_NUMBER}"
                 
                 // This step copies the artifact from the CI job
-                copyArtifacts projectName: 'Python-CI-Pipeline', 
+                copyArtifacts projectName: 'python pipeline', 
                               selector: specific("${params.UPSTREAM_BUILD_NUMBER}"), 
                               filter: "${ARTIFACT_NAME}"
             }
