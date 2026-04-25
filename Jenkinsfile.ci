@@ -48,19 +48,23 @@ pipeline {
             }
         }
         
-        stage('Trigger CD Pipeline') {
-            steps {
-                // Trigger the downstream CD job, passing the current build number
-                // wait: false means the CI job finishes successfully without waiting for CD to finish
-                build job: 'Python-CD-Pipeline', 
-                      parameters: [string(name: 'UPSTREAM_BUILD_NUMBER', value: String.valueOf(BUILD_NUMBER))], 
-                      wait: false
-            }
-        }
-    }
     post {
+        // Only triggers if all stages above pass successfully
+        // Trigger the downstream CD job, passing the current build number
+        // wait: false means the CI job finishes successfully without waiting for CD to finish
+        success {
+            echo "CI completed successfully. Triggering CD pipeline..."
+            build job: 'Python-CD-Pipeline', 
+                  parameters: [string(name: 'UPSTREAM_BUILD_NUMBER', value: String.valueOf(BUILD_NUMBER))], 
+                  wait: false
+        }
+        // Always cleans up the workspace, regardless of success or failure
         always {
             cleanWs()
+        }
+        // Optional: Add a failure block to notify the team if CI breaks
+        failure {
+            echo "CI Pipeline failed! Deployment aborted."
         }
     }
 }
