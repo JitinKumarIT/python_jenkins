@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    
+    // Define the parameter expected from the CI pipeline
+    parameters {
+        string(name: 'UPSTREAM_BUILD_NUMBER', defaultValue: 'latest', description: 'Build number from the CI pipeline')
+    }
+
+    environment {
+        ARTIFACT_NAME = "python-app-build.zip"
+        DEPLOY_DIR = "/tmp/production-app"
+    }
+
+    stages {
+        stage('Fetch Artifact') {
+            steps {
+                echo "Fetching artifact from CI Pipeline Build: ${params.UPSTREAM_BUILD_NUMBER}"
+                
+                // This step copies the artifact from the CI job
+                copyArtifacts projectName: 'Python-CI-Pipeline', 
+                              selector: specific("${params.UPSTREAM_BUILD_NUMBER}"), 
+                              filter: "${ARTIFACT_NAME}"
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    echo "Starting deployment process..."
+                    mkdir -p ${DEPLOY_DIR}
+                    
+                    # Extract the fetched artifact
+                    unzip -o ${ARTIFACT_NAME} -d ${DEPLOY_DIR}
+                    
+                    # Simulate starting the app
+                    cd ${DEPLOY_DIR}
+                    python3 -m venv prod_venv
+                    . prod_venv/bin/activate
+                    pip install -r requirements.txt
+                    
+                    echo "Application successfully deployed to ${DEPLOY_DIR}!"
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
