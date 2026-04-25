@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHON_VENV = "venv"
+        ARTIFACT_NAME = "python-app-build.zip"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Code Security Scan (SAST)') {
+            steps {
+                // Fail fast if security vulnerabilities are found in the code
+                echo "Running security scan..."
+                sh '''
+                    python3 -m venv ${PYTHON_VENV}
+                    . ${PYTHON_VENV}/bin/activate
+                    pip install bandit
+                    
+                    # Run bandit against the app directory/files. 
+                    # If high severity issues are found, this exits with code 1 and fails the pipeline.
+                    bandit -r app.py
+                '''
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh '''
+                    . ${PYTHON_VENV}/bin/activate
+                    pip install -r requirements.txt
+                    python3 -m unittest test_app.py
+                '''
+            }
+        }
+
+        stage('Create & Archive Artifact') {
+            steps {
+                sh 'zip -r ${ARTIFACT_NAME} app.py requirements.txt'
+                
+                // Archive the artifact so the CD pipeline can grab it later
+                archiveArtifacts artifacts: "${ARTIFACT_NAME}", fingerprint: true
+            }
+        }
+        
+        stage('Trigger CD Pipeline') {
+            steps {
+                // Trigger the downstream CD job, passing the current build number
+                // wait: false means the CI job finishes successfully without waiting for CD to finish
+                build job: 'Python-CD-Pipeline', 
+                      parameters: [string(name: 'UPSTREAM_BUILD_NUMBER', value: String.valueOf(BUILD_NUMBER))], 
+                      wait: false
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
