@@ -4,7 +4,7 @@ pipeline {
     environment {
         PYTHON_VENV = "venv"
         // CHANGE THIS TO YOUR DOCKER HUB USERNAME / REPO
-        DOCKER_IMAGE = "yourdockerhubuser/python-flask-app" 
+        DOCKER_IMAGE = "aritik70/python-flask-app" 
         DOCKER_TAG = "${BUILD_NUMBER}"
     }
 
