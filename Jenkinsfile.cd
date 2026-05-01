@@ -1,44 +1,32 @@
 pipeline {
     agent any
     
-    // Define the parameter expected from the CI pipeline
     parameters {
-        string(name: 'UPSTREAM_BUILD_NUMBER', defaultValue: 'latest', description: 'Build number from the CI pipeline')
+        string(name: 'UPSTREAM_BUILD_NUMBER', defaultValue: 'latest', description: 'Build number to deploy')
     }
 
     environment {
-        ARTIFACT_NAME = "python-app-build.zip"
-        DEPLOY_DIR = "/tmp/production-app"
+        // MUST MATCH THE IMAGE NAME IN YOUR CI PIPELINE
+        DOCKER_IMAGE = "aritik70/python-flask-app"
     }
 
     stages {
-        stage('Fetch Artifact') {
-            steps {
-                echo "Fetching artifact from CI Pipeline Build: ${params.UPSTREAM_BUILD_NUMBER}"
-                
-                // This step copies the artifact from the CI job
-                copyArtifacts projectName: 'python pipeline', 
-                              selector: specific("${params.UPSTREAM_BUILD_NUMBER}"), 
-                              filter: "${ARTIFACT_NAME}"
-            }
-        }
-
-        stage('Deploy') {
+        stage('Deploy Container') {
             steps {
                 sh '''
-                    echo "Starting deployment process..."
-                    mkdir -p ${DEPLOY_DIR}
+                    echo "Deploying Docker container..."
                     
-                    # Extract the fetched artifact
-                    unzip -o ${ARTIFACT_NAME} -d ${DEPLOY_DIR}
+                    # 1. Stop and remove the old container if it exists (ignoring errors if it doesn't)
+                    docker stop python-app-prod || true
+                    docker rm python-app-prod || true
                     
-                    # Simulate starting the app
-                    cd ${DEPLOY_DIR}
-                    python3 -m venv prod_venv
-                    . prod_venv/bin/activate
-                    pip install -r requirements.txt
+                    # 2. Pull the exact image built by the CI pipeline from Docker Hub
+                    docker pull ${DOCKER_IMAGE}:${params.UPSTREAM_BUILD_NUMBER}
                     
-                    echo "Application successfully deployed to ${DEPLOY_DIR}!"
+                    # 3. Run the new container
+                    docker run -d -p 5000:5000 --name python-app-prod ${DOCKER_IMAGE}:${params.UPSTREAM_BUILD_NUMBER}
+                    
+                    echo "Container successfully deployed and running on port 5000!"
                 '''
             }
         }
