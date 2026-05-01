@@ -3,28 +3,23 @@ pipeline {
     
     environment {
         PYTHON_VENV = "venv"
-        ARTIFACT_NAME = "python-app-build.zip"
+        // CHANGE THIS TO YOUR DOCKER HUB USERNAME / REPO
+        DOCKER_IMAGE = "yourdockerhubuser/python-flask-app" 
+        DOCKER_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Code Security Scan (SAST)') {
             steps {
-                echo "Running security scan in Audit Mode..."
-                
-                // Catch any failure inside this block, mark stage as UNSTABLE, and continue
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh '''
                         python3 -m venv ${PYTHON_VENV}
                         . ${PYTHON_VENV}/bin/activate
                         pip install bandit
-                        
-                        # If this finds issues, it exits with 1, which catchError intercepts
                         bandit -r app.py
                     '''
                 }
@@ -41,33 +36,44 @@ pipeline {
             }
         }
 
-        stage('Create & Archive Artifact') {
+        stage('Build Docker Image') {
             steps {
-                sh 'zip -r ${ARTIFACT_NAME} app.py requirements.txt'
-                
-                // Archive the artifact so the CD pipeline can grab it later
-                archiveArtifacts artifacts: "${ARTIFACT_NAME}", fingerprint: true
+                echo "Building Docker Image..."
+                // Build the image and tag it with the Jenkins Build Number
+                sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                // Also tag it as 'latest'
+                sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
             }
         }
-   }
-        
+
+        stage('Push to Docker Hub') {
+            steps {
+                // Fetch credentials securely from Jenkins
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh '''
+                        # Login to Docker Hub
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        
+                        # Push the specific build tag and the latest tag
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+                    '''
+                }
+            }
+        }
+    }
+    
     post {
-        // Only triggers if all stages above pass successfully
-        // Trigger the downstream CD job, passing the current build number
-        // wait: false means the CI job finishes successfully without waiting for CD to finish
         success {
-            echo "CI completed successfully. Triggering CD pipeline..."
+            echo "Image pushed successfully! Triggering Deployment..."
             build job: 'Python-CD-Pipeline', 
                   parameters: [string(name: 'UPSTREAM_BUILD_NUMBER', value: String.valueOf(BUILD_NUMBER))], 
                   wait: false
         }
-        // Always cleans up the workspace, regardless of success or failure
         always {
+            // Clean up the local Docker image to save disk space on the Jenkins agent
+            sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true"
             cleanWs()
-        }
-        // Optional: Add a failure block to notify the team if CI breaks
-        failure {
-            echo "CI Pipeline failed! Deployment aborted."
         }
     }
 }
